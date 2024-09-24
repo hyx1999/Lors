@@ -52,7 +52,7 @@ def main():
 
     print(f"loading llm model {args.model_name}")
     model = get_llm(args, device)
-    tokenizer = AutoTokenizer.from_pretrained(args.model, use_fast=False)
+    tokenizer = AutoTokenizer.from_pretrained(args.model_name, use_fast=False)
     
     if tokenizer.eos_token is None:
         tokenizer.add_special_tokens({"eos_token": "<|endoftext|>"})
@@ -73,14 +73,14 @@ def main():
     if args.task == "nlu":   
         task_list = ["boolq", "rte","hellaswag","winogrande", "arc_easy","arc_challenge", "openbookqa"]
         num_shot = 0
-        results = eval_zero_shot(args.model, model, tokenizer, task_list, num_shot, False)
+        results = eval_zero_shot(args.model_name, model, tokenizer, task_list, num_shot, False)
         print("********************************")
         print("zero_shot evaluation results")
         print(results)
     elif args.task == "gsm8k":
         task_list = ["gsm8k"]
         num_shot = 0
-        results = eval_zero_shot(args.model, model, tokenizer, task_list, num_shot, False)
+        results = eval_zero_shot(args.model_name, model, tokenizer, task_list, num_shot, False)
         print("********************************")
         print("gsm8k results")
         print(results)
