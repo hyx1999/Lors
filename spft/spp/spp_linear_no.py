@@ -4,7 +4,7 @@ import torch.nn.functional as F
 import math
 from torch.utils import checkpoint
 from peft.utils import transpose
-from .linear import Linear
+from spft.base.linear import Linear
 
 
 class LoraLayer:
@@ -43,7 +43,7 @@ class DiagonalLinear(nn.Module):
     def forward(self, matrix, x):
         return self._checkpointed_forward(x, self.weight, self.weight_col, matrix)
 
-class SppNaiveLinear(Linear, LoraLayer):
+class SppLinearNO(Linear, LoraLayer):
     # Lora implemented in a dense layer
     def __init__(
         self,

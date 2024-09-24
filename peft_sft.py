@@ -57,8 +57,7 @@ from utils.parser_utils import add_default_opts
 from utils.scheduler import get_cosine_schedule_with_warmup
 from utils.prompter import Prompter
 
-from peft import LoraConfig, get_peft_model
-from ext_peft import ExtLoraConfig, ext_get_peft_model, ext_merge_and_unload
+from spft import AnyConfig, get_ext_peft_model, merge_and_unload
 from utils.data_utils import process_sft_data
 
 # Will error if the minimal version of Transformers is not installed. Remove at your own risks.
@@ -211,7 +210,7 @@ def main():
     else:
         raise ValueError
 
-    peft_config = ExtLoraConfig(
+    peft_config = AnyConfig(
         method=args.peft_method,
         r=args.lora_rank,
         lora_alpha=args.lora_rank,
@@ -227,7 +226,7 @@ def main():
         bias="none",
         task_type="CAUSAL_LM",
     )
-    model = ext_get_peft_model(model, peft_config)
+    model = get_ext_peft_model(model, peft_config)
     
     # We resize the embeddings only when necessary to avoid index errors. If you are creating a model from scratch
     # on a small vocab and want a smaller embedding size, remove this test.
@@ -471,7 +470,7 @@ def main():
     if args.output_dir is not None:
         accelerator.wait_for_everyone()
         unwrapped_model = accelerator.unwrap_model(model)
-        unwrapped_model = ext_merge_and_unload(unwrapped_model, peft_config)
+        unwrapped_model = merge_and_unload(unwrapped_model, peft_config)
 
         unwrapped_model.to("cpu")
         unwrapped_model.save_pretrained(args.output_dir, is_main_process=accelerator.is_main_process)

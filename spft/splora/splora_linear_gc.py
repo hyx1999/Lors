@@ -8,10 +8,10 @@ from abc import ABC
 from types import MethodType
 from typing import Optional, Dict, Callable
 from torch.utils.checkpoint import checkpoint
-from .linear import Linear
+from spft.base.linear import Linear
 
 
-class SpLoraNaiveLinear(Linear):
+class SpLoraLinearGC(Linear):
     
     def __init__(self, 
         # linear
@@ -30,13 +30,13 @@ class SpLoraNaiveLinear(Linear):
         self.scaling = lora_alpha / r
         self._reset_lora_parameters()
     
-    def fuse_weight(self):
-        mask = (self.weight != 0)
-        weight = self.weight + mask * (self.lora_B @ self.lora_A)
+    def fuse_weight(self, w, A, B):
+        mask = (self.weight != 0).detach()
+        weight = w + mask * (B @ A)
         return weight
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        weight = self.fuse_weight()
+        weight = checkpoint(self.fuse_weight, self.weight, self.lora_A, self.lora_B)
         return F.linear(x, weight, self.bias)
     
     def _reset_lora_parameters(self) -> None:

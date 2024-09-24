@@ -7,7 +7,7 @@ from typing import Tuple
 from abc import ABC
 from types import MethodType
 from typing import Optional, Dict, Callable
-from .linear import Linear
+from spft.base.linear import Linear
 
 
 class SpLoraFn(Function):

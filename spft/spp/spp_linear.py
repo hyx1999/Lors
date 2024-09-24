@@ -4,7 +4,7 @@ import torch.nn.functional as F
 from torch.utils import checkpoint
 import math
 from peft.utils import transpose
-from .linear import Linear
+from spft.base.linear import Linear
 
 
 class LoraLayer:
