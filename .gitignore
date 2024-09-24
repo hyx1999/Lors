@@ -10,3 +10,6 @@ rsync_dir.sh
 __pycache__/
 *.py[cod]
 *$py.class
+
+# Log
+log
