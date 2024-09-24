@@ -53,13 +53,12 @@ from transformers import (
     get_scheduler,
 )
 
-from utils.opts import add_default_opts
+from utils.parser_utils import add_default_opts
 from utils.scheduler import get_cosine_schedule_with_warmup
 from utils.prompter import Prompter
 
-from peft import LoraConfig, get_peft_model
 from ext_peft import ExtLoraConfig, ext_get_peft_model, ext_merge_and_unload
-from utils.data_sft_domain import load_dataset_sft_domain
+from utils.data_utils import process_pretrain_data
 
 # Will error if the minimal version of Transformers is not installed. Remove at your own risks.
 # check_min_version("4.40.0.dev0")
@@ -76,18 +75,6 @@ def parse_args():
     parser = argparse.ArgumentParser(description="Finetune a transformers model on a causal language modeling task")
     add_default_opts(parser)
 
-    parser.add_argument(
-        "--dataset_type", 
-        type=str, 
-        default="pretrain", 
-        choices=["pretrain", "sft", "sft-domain"]
-    )
-
-    # sft
-    parser.add_argument("--cutoff_len", type=int, default=2048)
-    parser.add_argument("--prompt_template_name", type=str, default="alpaca")
-    parser.add_argument("--val_set_size", type=int, default=2000)
-    
     # corpus
     parser.add_argument(
         "--block_size",
@@ -106,7 +93,9 @@ def parse_args():
     )
     parser.add_argument("--lora_rank", type=int, default=16)
 
-    parser.add_argument("--no_test", action="store_true")
+    parser.add_argument("--evaluate", action="store_true")
+    parser.add_argument("--process_raw_dataset", action="store_true")
+
     args = parser.parse_args()
 
     # Sanity checks
@@ -217,11 +206,9 @@ def main():
     tokenizer.padding_side = "left"  # Allow batched inference
 
     if args.model_name_or_path:
-        kwargs = {}
-        # if args.use_flash_attn:
-        kwargs.update({
-            "torch_dtype": torch.bfloat16,
-        })
+        kwargs = {
+            "torch_dtype": torch.bfloat16
+        }
         model = AutoModelForCausalLM.from_pretrained(
             args.model_name_or_path,
             from_tf=bool(".ckpt" in args.model_name_or_path),
@@ -266,177 +253,28 @@ def main():
     #
     # In distributed training, the load_dataset function guarantee that only one local process can concurrently
     # download the dataset.
-    if args.dataset_name is not None:
-        if args.dataset_name == "wikitext2":
-            raw_datasets = load_dataset('./datasets/wikitext', 'wikitext-2-raw-v1')
-        elif args.dataset_name == "wikitext103":
-            raw_datasets = load_dataset('./datasets/wikitext', 'wikitext-103-raw-v1')
-        elif args.dataset_name == "alpaca":
-            raw_datasets = load_dataset("json", data_files='./datasets/alpaca_data_gpt4.json')
-        elif args.dataset_name == "meta-math":
-            raw_datasets = load_dataset("json", data_files='./datasets/MetaMathQA/MetaMathQA-395K.json')
-        elif args.dataset_name == "wizardlm":
-            raw_datasets = load_dataset("json", data_files='./datasets/Wizard-LM-Chinese-instruct-evol/wizard_700k.jsonl')
-        elif args.dataset_name == "codefeedback":
-            raw_datasets = load_dataset("json", data_files='./datasets/CodeFeedback-Filtered-Instruction/CodeFeedback-Filtered-Instruction.jsonl')
-        else:
-            raw_datasets = load_from_disk('{}'.format(args.dataset_name))
-    else:
-        raise ValueError
+    raw_datasets = load_from_disk('{}'.format(args.dataset_name))
 
-    if not args.dataset_name.endswith('-ap'):  # -ap: after processing     
-        if args.dataset_type == "pretrain":
-            # Preprocessing the datasets.
-            # First we tokenize all the texts.
-            column_names = raw_datasets["train"].column_names
-            text_column_name = "text" if "text" in column_names else column_names[0]
-
-            def tokenize_function(examples):
-                return tokenizer(examples[text_column_name])
-
-            with accelerator.main_process_first():
-                tokenized_datasets = raw_datasets.map(
-                    tokenize_function,
-                    batched=True,
-                    num_proc=args.preprocessing_num_workers,
-                    remove_columns=column_names,
-                    load_from_cache_file=not args.overwrite_cache,
-                    desc="Running tokenizer on dataset",
-                )
-
-            if args.block_size is None:
-                block_size = tokenizer.model_max_length
-                if block_size > config.max_position_embeddings:
-                    logger.warning(
-                        f"The tokenizer picked seems to have a very large `model_max_length` ({tokenizer.model_max_length}). "
-                        f"Using block_size={min(1024, config.max_position_embeddings)} instead. You can change that default value by passing --block_size xxx."
-                    )
-                    block_size = min(1024, config.max_position_embeddings)
-            else:
-                if args.block_size > tokenizer.model_max_length:
-                    logger.warning(
-                        f"The block_size passed ({args.block_size}) is larger than the maximum length for the model "
-                        f"({tokenizer.model_max_length}). Using block_size={tokenizer.model_max_length}."
-                    )
-                block_size = min(args.block_size, tokenizer.model_max_length)
-
-            # Main data processing function that will concatenate all texts from our dataset and generate chunks of block_size.
-            def group_texts(examples):
-                # Concatenate all texts.
-                concatenated_examples = {k: list(chain(*examples[k])) for k in examples.keys()}
-                total_length = len(concatenated_examples[list(examples.keys())[0]])
-                # We drop the small remainder, and if the total_length < block_size  we exclude this batch and return an empty dict.
-                # We could add padding if the model supported it instead of this drop, you can customize this part to your needs.
-                total_length = (total_length // block_size) * block_size
-                # Split by chunks of max_len.
-                result = {
-                    k: [t[i : i + block_size] for i in range(0, total_length, block_size)]
-                    for k, t in concatenated_examples.items()
-                }
-                result["labels"] = result["input_ids"].copy()
-                return result
-
-            # Note that with `batched=True`, this map processes 1,000 texts together, so group_texts throws away a remainder
-            # for each of those groups of 1,000 texts. You can adjust that batch_size here but a higher value might be slower
-            # to preprocess.
-            #
-            # To speed up this part, we use multiprocessing. See the documentation of the map method for more information:
-            # https://huggingface.co/docs/datasets/process#map
-
-            with accelerator.main_process_first():
-                lm_datasets = tokenized_datasets.map(
-                    group_texts,
-                    batched=True,
-                    num_proc=args.preprocessing_num_workers,
-                    load_from_cache_file=not args.overwrite_cache,
-                    desc=f"Grouping texts in chunks of {block_size}",
-                )
-        elif args.dataset_type == "sft":
-            column_names = raw_datasets["train"].column_names
-            prompter = Prompter(args.prompt_template_name)
-    
-            def tokenize(prompt, add_eos_token=True):
-                # there's probably a way to do this with the tokenizer settings
-                # but again, gotta move fast
-                result = tokenizer(
-                    prompt,
-                    truncation=True,
-                    max_length=args.cutoff_len,
-                    padding=False,
-                    return_tensors=None,
-                )
-                if (
-                    result["input_ids"][-1] != tokenizer.eos_token_id
-                    and len(result["input_ids"]) < args.cutoff_len
-                    and add_eos_token
-                ):
-                    result["input_ids"].append(tokenizer.eos_token_id)
-                    result["attention_mask"].append(1)
-
-                result["labels"] = result["input_ids"].copy()
-
-                return result
-
-            def generate_and_tokenize_prompt(data_point):
-                full_prompt = prompter.generate_prompt(
-                    data_point["instruction"],
-                    data_point["input"],
-                    data_point["output"],
-                )
-                tokenized_full_prompt = tokenize(full_prompt)
-                return tokenized_full_prompt
-
-            with accelerator.main_process_first():
-                lm_datasets = raw_datasets.map(
-                    generate_and_tokenize_prompt,
-                    remove_columns=column_names,
-                    num_proc=args.preprocessing_num_workers,
-                    load_from_cache_file=not args.overwrite_cache,
-                    desc=f"Processing sft datasets",
-                )
-                lm_datasets = lm_datasets["train"].train_test_split(
-                    test_size=args.val_set_size, shuffle=True, seed=args.seed
-                )
-                lm_datasets["validation"] = lm_datasets["test"]
-        elif args.dataset_type == "sft-domain":
-            train_dataset, eval_dataset = load_dataset_sft_domain(args.dataset_name, raw_datasets, tokenizer)
-            lm_datasets = {
-                "train": train_dataset,
-                "validation": eval_dataset,
-            }
-        else:
-            raise ValueError
+    if args.process_raw_dataset:
+        lm_datasets = process_pretrain_data(args, config, raw_datasets, tokenizer, accelerator)
     else:
         lm_datasets = raw_datasets
-        if "validation" not in lm_datasets:
-            lm_datasets = lm_datasets["train"].train_test_split(
-                test_size=1024, shuffle=True, seed=args.seed
-            )
-            lm_datasets["validation"] = lm_datasets["test"]
+
+    if "validation" not in lm_datasets:
+        lm_datasets = lm_datasets["train"].train_test_split(
+            test_size=1024, shuffle=True, seed=args.seed
+        )
+        lm_datasets["validation"] = lm_datasets["test"]
 
     train_dataset = lm_datasets["train"]
     eval_dataset = lm_datasets["validation"]
-    
-    # Log a few random samples from the training set:
-    # for index in random.sample(range(len(train_dataset)), 3):
-    #     logger.info(f"Sample {index} of the training set: {train_dataset[index]}.")
 
-    # DataLoaders creation:
-    
-    if args.dataset_type == "sft" or args.dataset_type == "sft-domain":
-        collate_fn=transformers.DataCollatorForSeq2Seq(
-            tokenizer, pad_to_multiple_of=8, return_tensors="pt", padding=True
-        )
-    elif args.dataset_type == "pretrain":
-        collate_fn=default_data_collator
-    else:
-        raise ValueError
-    
+    # DataLoaders creation:    
     train_dataloader = DataLoader(
-        train_dataset, shuffle=True, collate_fn=collate_fn, batch_size=args.per_device_train_batch_size
+        train_dataset, shuffle=True, collate_fn=default_data_collator, batch_size=args.per_device_train_batch_size
     )
     eval_dataloader = DataLoader(
-        eval_dataset, collate_fn=collate_fn, batch_size=args.per_device_eval_batch_size
+        eval_dataset, collate_fn=default_data_collator, batch_size=args.per_device_eval_batch_size
     )
 
     # Optimizer
@@ -598,7 +436,7 @@ def main():
                 if completed_steps >= args.max_train_steps:
                     break
         
-        if not args.no_test:
+        if args.evaluate:
             model.eval()
             losses = []
             for step, batch in tqdm(enumerate(eval_dataloader), 
