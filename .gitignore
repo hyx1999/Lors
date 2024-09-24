@@ -5,3 +5,8 @@ datasets
 bak
 scripts_local
 rsync_dir.sh
+
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
