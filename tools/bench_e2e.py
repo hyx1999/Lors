@@ -1,47 +1,43 @@
-from loss_llama import LossLlamaForCausalLM, to_sparse_linear, to_dense_linear
 from transformers import LlamaForCausalLM, LlamaTokenizer, GenerationConfig
-from utils.data import get_loaders
+from utils.data_utils.calib_data import load_calib_data
 from tqdm import tqdm
 import time
 import torch
 import torch.nn as nn
 import argparse
 import gc
-from torch.sparse.semi_structured import SparseSemiStructuredTensor
+from torch.sparse.semi_structured import SparseSemiStructuredTensor, to_sparse_semi_structured
 from peft import LoraConfig, get_peft_model, TaskType
 
     
 def parse_args():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--base_model', type=str, required=True)
-    parser.add_argument('--sparse_model', type=str, required=True)
+    parser.add_argument('--model_name', type=str, required=True)
     parser.add_argument('--batch_size', type=int, default=8)
     parser.add_argument('--length', type=int, default=128)
     parser.add_argument('--cutlass', action="store_true")
     return parser.parse_args()
 
+
+@torch.no_grad()
+def to_sparse_linear(model: nn.Module):
+    for module in model.named_modules():
+        if isinstance(module, nn.Linear):
+            module.weight = nn.Parameter(to_sparse_semi_structured(module.weight))
+
+
 @torch.inference_mode()
-def bench_generate(args, all_input_ids, model_type, model_name, dev):
-    model = model_type.from_pretrained(
-        model_name,
+def bench_generate(args, all_input_ids, model_type, dev):
+    model = LlamaForCausalLM.from_pretrained(
+        args.model_name,
         torch_dtype=torch.float16,
-        device_map="cpu"
+        device_map=dev
     )
-    model.to(dev)
     model.eval()
 
-    if isinstance(model, LossLlamaForCausalLM):
+    if model_type == "sparse":
+        print("dense model => sparse model...")
         to_sparse_linear(model)
-    else:
-        # Add adapters
-        lora_config = LoraConfig(
-            r=32,
-            target_modules=["q_proj", "k_proj", "v_proj", "up_proj", "gate_proj"],
-            task_type=TaskType.CAUSAL_LM,
-            lora_alpha=32,
-            lora_dropout=0.05
-        )
-        model = get_peft_model(model, lora_config)
     
     torch.cuda.empty_cache()
     gc.collect()
@@ -75,28 +71,18 @@ def bench_generate(args, all_input_ids, model_type, model_name, dev):
 
 
 @torch.inference_mode()
-def bench_prefill(args, all_input_ids, model_type, model_name, dev):
+def bench_prefill(args, all_input_ids, model_type, dev):
     model = model_type.from_pretrained(
-        model_name,
+        args.model_name,
         torch_dtype=torch.float16,
         device_map="cpu"
     )
     model.to(dev)
     model.eval()
     
-    if isinstance(model, (LossLlamaForCausalLM)):
+    if model_type == "sparse":
         print("dense model => sparse model...")
         to_sparse_linear(model)
-    else:
-        # Add adapters
-        lora_config = LoraConfig(
-            r=32,
-            target_modules=["q_proj", "k_proj", "v_proj", "up_proj", "gate_proj"],
-            task_type=TaskType.CAUSAL_LM,
-            lora_alpha=32,
-            lora_dropout=0.05
-        )
-        model = get_peft_model(model, lora_config)
     
     torch.cuda.empty_cache()
     gc.collect()
@@ -128,7 +114,7 @@ def main():
         SparseSemiStructuredTensor._FORCE_CUTLASS = True
     tokenizer = LlamaTokenizer.from_pretrained(args.base_model)
 
-    _, testenc = get_loaders("wikitext2", seed=0, seqlen=args.length, tokenizer=tokenizer)
+    _, testenc = load_calib_data("wikitext2", seed=0, seqlen=args.length, tokenizer=tokenizer)
 
     # Convert the whole text of evaluation dataset into batches of sequences.
     all_input_ids = testenc.input_ids  # (1, text_len)
@@ -136,8 +122,8 @@ def main():
     all_input_ids = all_input_ids[:, :nsamples * args.length].view(nsamples, args.length)  # (nsamples, seqlen)
     all_input_ids = all_input_ids[:16]
 
-    sparse_time = bench_prefill(args, all_input_ids, LossLlamaForCausalLM, args.sparse_model, "cuda")    
-    base_time = bench_prefill(args, all_input_ids, LlamaForCausalLM, args.base_model, "cuda")
+    sparse_time = bench_prefill(args, all_input_ids, "sparse", "cuda")
+    base_time = bench_prefill(args, all_input_ids, "dense", "cuda")
     # sparse_time = bench_generate(args, all_input_ids, LossLlamaForCausalLM, args.sparse_model, "cuda")    
     # base_time = bench_generate(args, all_input_ids, LlamaForCausalLM, args.base_model, "cuda")
     print("=" * 10 + ">")
