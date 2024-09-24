@@ -1,0 +1,8 @@
+qwen2-7b => wikitext perplexity: 7.135603427886963
+
+qwen2-7b sparsegpt.2of4 => wikitext perplexity: 11.302942276000977
+
+qwen2-7b wanda.2of4 => wikitext perplexity: 13.622998237609863
+
+------------------------- 0.5B, lr = 1e-3 --------------------------------------
+

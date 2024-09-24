@@ -1,0 +1,5 @@
+x = input("evaluate result=")
+x = x.replace("&", " ").strip().split()
+x = list(map(float, x))
+print(x)
+print(sum(x) / len(x))

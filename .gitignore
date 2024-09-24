@@ -1,0 +1,7 @@
+.vscode
+checkpoints
+datasets
+3dparty
+bak
+scripts_local
+rsync_dir.sh

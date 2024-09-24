@@ -1,0 +1,75 @@
+Llama3.1-8b-instruct => wikitext perplexity: 7.210715293884277
+zero_shot evaluation results
+|    Tasks    |Version|Filter|n-shot| Metric |   |Value |   |Stderr|
+|-------------|------:|------|-----:|--------|---|-----:|---|-----:|
+|arc_challenge|      1|none  |     0|acc     |↑  |0.5171|±  |0.0146|
+|             |       |none  |     0|acc_norm|↑  |0.5512|±  |0.0145|
+|arc_easy     |      1|none  |     0|acc     |↑  |0.8186|±  |0.0079|
+|             |       |none  |     0|acc_norm|↑  |0.7967|±  |0.0083|
+|boolq        |      2|none  |     0|acc     |↑  |0.8407|±  |0.0064|
+|hellaswag    |      1|none  |     0|acc     |↑  |0.5910|±  |0.0049|
+|             |       |none  |     0|acc_norm|↑  |0.7929|±  |0.0040|
+|openbookqa   |      1|none  |     0|acc     |↑  |0.3380|±  |0.0212|
+|             |       |none  |     0|acc_norm|↑  |0.4300|±  |0.0222|
+|rte          |      1|none  |     0|acc     |↑  |0.6787|±  |0.0281|
+|winogrande   |      1|none  |     0|acc     |↑  |0.7395|±  |0.0123|
+
+Llama3.1-8b-instruct_sparsegpt.2of4 => wikitext perplexity: wikitext perplexity: 18.185216903686523
+|    Tasks    |Version|Filter|n-shot| Metric |   |Value |   |Stderr|
+|-------------|------:|------|-----:|--------|---|-----:|---|-----:|
+|arc_challenge|      1|none  |     0|acc     |↑  |0.3430|±  |0.0139|
+|             |       |none  |     0|acc_norm|↑  |0.3729|±  |0.0141|
+|arc_easy     |      1|none  |     0|acc     |↑  |0.6545|±  |0.0098|
+|             |       |none  |     0|acc_norm|↑  |0.6267|±  |0.0099|
+|boolq        |      2|none  |     0|acc     |↑  |0.7774|±  |0.0073|
+|hellaswag    |      1|none  |     0|acc     |↑  |0.4356|±  |0.0049|
+|             |       |none  |     0|acc_norm|↑  |0.5901|±  |0.0049|
+|openbookqa   |      1|none  |     0|acc     |↑  |0.2220|±  |0.0186|
+|             |       |none  |     0|acc_norm|↑  |0.3320|±  |0.0211|
+|rte          |      1|none  |     0|acc     |↑  |0.6173|±  |0.0293|
+|winogrande   |      1|none  |     0|acc     |↑  |0.6630|±  |0.0133|
+
+
+Llama3.1-8b-instruct_sparsegpt.2of4_fineweb-5B => wikitext perplexity: 9.1
+zero_shot evaluation results
+|    Tasks    |Version|Filter|n-shot| Metric |   |Value |   |Stderr|
+|-------------|------:|------|-----:|--------|---|-----:|---|-----:|
+|arc_challenge|      1|none  |     0|acc     |↑  |0.4360|±  |0.0145|
+|             |       |none  |     0|acc_norm|↑  |0.4608|±  |0.0146|
+|arc_easy     |      1|none  |     0|acc     |↑  |0.7790|±  |0.0085|
+|             |       |none  |     0|acc_norm|↑  |0.7264|±  |0.0091|
+|boolq        |      2|none  |     0|acc     |↑  |0.7636|±  |0.0074|
+|hellaswag    |      1|none  |     0|acc     |↑  |0.5419|±  |0.0050|
+|             |       |none  |     0|acc_norm|↑  |0.7239|±  |0.0045|
+|openbookqa   |      1|none  |     0|acc     |↑  |0.3240|±  |0.0210|
+|             |       |none  |     0|acc_norm|↑  |0.4380|±  |0.0222|
+|rte          |      1|none  |     0|acc     |↑  |0.6462|±  |0.0288|
+|winogrande   |      1|none  |     0|acc     |↑  |0.6985|±  |0.0129|
+
+Llama3.1-8b-instruct_sparsegpt.2of4_fineweb-5B_alpaca => wikitext perplexity: 10.213223457336426
+|    Tasks    |Version|Filter|n-shot| Metric |   |Value |   |Stderr|
+|-------------|------:|------|-----:|--------|---|-----:|---|-----:|
+|arc_challenge|      1|none  |     0|acc     |↑  |0.4480|±  |0.0145|
+|             |       |none  |     0|acc_norm|↑  |0.4693|±  |0.0146|
+|arc_easy     |      1|none  |     0|acc     |↑  |0.7454|±  |0.0089|
+|             |       |none  |     0|acc_norm|↑  |0.6738|±  |0.0096|
+|boolq        |      2|none  |     0|acc     |↑  |0.7798|±  |0.0072|
+|hellaswag    |      1|none  |     0|acc     |↑  |0.5586|±  |0.0050|
+|             |       |none  |     0|acc_norm|↑  |0.7377|±  |0.0044|
+|openbookqa   |      1|none  |     0|acc     |↑  |0.3480|±  |0.0213|
+|             |       |none  |     0|acc_norm|↑  |0.4560|±  |0.0223|
+|rte          |      1|none  |     0|acc     |↑  |0.6787|±  |0.0281|
+|winogrande   |      1|none  |     0|acc     |↑  |0.7001|±  |0.0129|
+
+
+Llama3.1-8b-instruct_sparsegpt.2of4_fineweb-5B_alpaca_meta-math
+|Tasks|Version|     Filter     |n-shot|  Metric   |   |Value |   |Stderr|
+|-----|------:|----------------|-----:|-----------|---|-----:|---|-----:|
+|gsm8k|      3|flexible-extract|     0|exact_match|↑  |0.6785|±  |0.0129|
+|     |       |strict-match    |     0|exact_match|↑  |0.6778|±  |0.0129|
+
+Llama3.1-8b-instruct_meta-math
+|Tasks|Version|     Filter     |n-shot|  Metric   |   |Value |   |Stderr|
+|-----|------:|----------------|-----:|-----------|---|-----:|---|-----:|
+|gsm8k|      3|flexible-extract|     0|exact_match|↑  |0.8021|±  | 0.011|
+|     |       |strict-match    |     0|exact_match|↑  |0.8014|±  | 0.011|

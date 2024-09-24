@@ -1,0 +1,15 @@
+ppl_test: 12.1142
+
+
+args:
+	model=checkpoints/Llama-2-7b-hf
+	seed=0
+	nsamples=128
+	sparsity_type=2:4
+	sparsity=None
+	prune_method=wanda
+	prune_groups=qkv,o,ug,d
+	save=log/wanda
+	save_model=checkpoints/tmp
+	dump_sparse_model=False
+	eval_zero_shot=False

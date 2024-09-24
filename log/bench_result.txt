@@ -1,0 +1,17 @@
+# SpLoraMask, 2GPU, per bs 1, 0.5B token, training time 51h, memory 34266 / 49140 MB
+# SpLora, 2GPU, per bs 1, 0.5B token, training time 53h, memory 28286 / 49140 MB
+
+
+SpLora A800 1GPU bs=1, 34837MiB / 81920MiB, training time 16s per 16 iter
+SPP  A800 1GPU bs=1, 35151MiB / 81920MiB, training time 22s per 16 iter
+SpLora A800 1GPU bs=1, 34837MiB / 81920MiB, training time 14s per 16 iter
+
+
+A6000:
+1. LoRA 26012MiB / 49140MiB, 1.13s/it
+2. SP-LoRA 26012MiB / 49140MiB, 1.28s/it
+3. SP-LoRA-gradckpt 38380MiB / 49140MiB, 1.40s/it
+4. SP-LoRA-naive 44236MiB / 49140MiB, 1.26s/it
+
+5. SPP 25830MiB / 49140MiB, 2.20s/it
+6. SPP naive OOM

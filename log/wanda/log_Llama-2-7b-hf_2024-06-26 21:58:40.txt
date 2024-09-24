@@ -1,0 +1,20 @@
+ppl_test: 84.3491
+
+
+args:
+	model=checkpoints/Llama-2-7b-hf
+	seed=0
+	nsamples=128
+	svd_rank=128
+	sparsity_type=unstructured
+	sparsity=0.8
+	prune_method=wanda
+	save=log/wanda_svd
+	save_model=checkpoints/Llama-2-7b-hf-sparse_us-r128
+	clip=True
+	clip_asym=True
+	reorder=False
+	whitening=False
+	clip_ratio=0.8
+	dump_sparse_model=True
+	eval_zero_shot=False
