@@ -52,7 +52,7 @@ def main():
 
     print(f"loading llm model {args.model_name}")
     model = get_llm(args, device)
-    tokenizer = AutoTokenizer.from_pretrained(args.model_name, use_fast=False)
+    tokenizer = AutoTokenizer.from_pretrained(args.model_name)
     
     if tokenizer.eos_token is None:
         tokenizer.add_special_tokens({"eos_token": "<|endoftext|>"})
