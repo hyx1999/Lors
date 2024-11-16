@@ -2,7 +2,7 @@ from dataclasses import dataclass, field
 from peft import LoraConfig
 from typing import Literal, Any
 from peft import LoraConfig
-from spft import SpLoraConfig, SppConfig
+from lors import SpLoraConfig, SppConfig
 
 config_dict = {
     "lora": LoraConfig,

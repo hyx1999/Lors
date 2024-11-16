@@ -26,6 +26,7 @@ def get_llm(args, device):
 
 def main():
     parser = argparse.ArgumentParser()
+    parser.add_argument('--model', type=str, help='LLaMA model')
     parser.add_argument('--model_name', type=str, help='LLaMA model')
     parser.add_argument('--seed', type=int, default=0, help='Seed for sampling the calibration data.')
     parser.add_argument('--nsamples', type=int, default=128, help='Number of calibration samples.')
@@ -52,7 +53,7 @@ def main():
 
     model_name = args.model.split("/")[-1]
     print(f"loading llm model {args.model}")
-    model = get_llm(args.model, device)
+    model = get_llm(args, device)
     tokenizer = AutoTokenizer.from_pretrained(args.model, use_fast=False)
     
     prune_model(args, model, tokenizer, device, prune_n=prune_n, prune_m=prune_m)

@@ -1,10 +1,10 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-import math
 from torch.utils import checkpoint
+import math
 from peft.utils import transpose
-from spft.base.linear import Linear
+from lors.base.linear import Linear
 
 
 class LoraLayer:
@@ -28,9 +28,9 @@ class LoraLayer:
         self.disable_adapters = False
 
 
-class DiagonalLinear(nn.Module):
+class DiagonalGradckptLinear(nn.Module):
     def __init__(self, in_feature, out_feature, r=16, dtype=None, device=None):
-        super(DiagonalLinear, self).__init__()
+        super(DiagonalGradckptLinear, self).__init__()
         self.r = r
         self.weight = nn.Parameter(torch.zeros(self.r, in_feature, dtype=dtype, device=device))
         self.weight_col = nn.Parameter(torch.zeros(out_feature, 1, dtype=dtype, device=device))
@@ -41,9 +41,11 @@ class DiagonalLinear(nn.Module):
         return F.linear(x, (mat1 * weight_col) * matrix)
 
     def forward(self, matrix, x):
-        return self._checkpointed_forward(x, self.weight, self.weight_col, matrix)
 
-class SppLinearNO(Linear, LoraLayer):
+        result = checkpoint.checkpoint(self._checkpointed_forward, x, self.weight, self.weight_col, matrix)
+        return result
+
+class SppLinear(Linear, LoraLayer):
     # Lora implemented in a dense layer
     def __init__(
         self,
@@ -64,7 +66,7 @@ class SppLinearNO(Linear, LoraLayer):
         self.fan_in_fan_out = fan_in_fan_out
         # Actual trainable parameters
         if r > 0:
-            self.lora_A = DiagonalLinear(in_features, out_features, r=16, dtype=kwargs["dtype"], device=kwargs["device"])
+            self.lora_A = DiagonalGradckptLinear(in_features, out_features, r=16, dtype=kwargs["dtype"], device=kwargs["device"])
             self.scaling = self.lora_alpha / self.r
             # Freezing the pre-trained weight matrix
             self.weight.requires_grad = False

@@ -13,7 +13,7 @@ from .spp import (
 )
 from .any_config import AnyConfig
 
-def get_spft_model(model, peft_config):
+def get_lors_model(model, peft_config):
     if peft_config.method in splora_modules.keys():
         return get_splora_model(model, peft_config)
     elif peft_config.method in spp_modules.keys():
@@ -21,7 +21,7 @@ def get_spft_model(model, peft_config):
     else:
         raise ValueError
 
-def spft_merge_and_unload(model, peft_config):
+def lors_merge_and_unload(model, peft_config):
     if peft_config.method in splora_modules.keys():
         return splora_merge_adapters(model)
     elif peft_config.method in spp_modules.keys():
@@ -30,13 +30,13 @@ def spft_merge_and_unload(model, peft_config):
         raise ValueError
 
 
-def get_ext_peft_model(model, any_config: AnyConfig, adapter_name: str = "default", mixed: bool = False):
+def get_peft_and_lors_model(model, any_config: AnyConfig, adapter_name: str = "default", mixed: bool = False):
     if any_config.config.method == "none":
         return model
     elif any_config.config.method == "lora":
         return get_peft_model(model, any_config.config, adapter_name, mixed)
     else:
-        raise get_spft_model(model, any_config.config)
+        raise get_lors_model(model, any_config.config)
 
 
 def merge_and_unload(model, any_config: AnyConfig):
@@ -45,4 +45,4 @@ def merge_and_unload(model, any_config: AnyConfig):
     elif any_config.config.method == "lora":
         return model.base_model.merge_and_unload()
     else:
-        return spft_merge_and_unload(model, any_config.config)
+        return lors_merge_and_unload(model, any_config.config)

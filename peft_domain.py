@@ -57,7 +57,7 @@ from utils.parser_utils import add_default_opts
 from utils.scheduler import get_cosine_schedule_with_warmup
 from utils.prompter import Prompter
 
-from spft import AnyConfig, get_ext_peft_model, merge_and_unload
+from lors import AnyConfig, get_peft_and_lors_model, merge_and_unload
 from utils.data_utils import process_domain_data
 
 # Will error if the minimal version of Transformers is not installed. Remove at your own risks.
@@ -228,7 +228,7 @@ def main():
         bias="none",
         task_type="CAUSAL_LM",
     )
-    model = get_ext_peft_model(model, any_config)
+    model = get_peft_and_lors_model(model, any_config)
     
     # We resize the embeddings only when necessary to avoid index errors. If you are creating a model from scratch
     # on a small vocab and want a smaller embedding size, remove this test.

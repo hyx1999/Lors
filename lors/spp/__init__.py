@@ -5,7 +5,7 @@ from typing import List, Tuple
 from .spp_linear import SppLinear
 from .spp_linear_no import SppLinearNO
 from .config import SppConfig
-from spft.base.spft_model import SpftModel
+from lors.base.lors_model import LorsModel
 
 spp_modules = {
     "spp": SppLinear,
@@ -37,7 +37,7 @@ def get_spp_model(
     for name, param in model.named_parameters():
         if not any(x in name for x in ["lora_A", "lora_B"]):
             param.requires_grad = False
-    return SpftModel(config, model)
+    return LorsModel(config, model)
 
 def spp_merge_adapters(model):
     for name, module in model.named_modules():

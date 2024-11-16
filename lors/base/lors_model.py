@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
 
-class SpftModel(nn.Module):
+class LorsModel(nn.Module):
     
     def __init__(self, config, base_model) -> None:
         super().__init__()

@@ -6,7 +6,7 @@ from .splora_linear import SpLoraLinear
 from .splora_linear_gc import SpLoraLinearGC
 from .splora_linear_no import SpLoraLinearNO
 from .config import SpLoraConfig
-from spft.base.spft_model import SpftModel
+from lors.base.lors_model import LorsModel
 
 splora_modules = {
     "splora": SpLoraLinear,
@@ -40,7 +40,7 @@ def get_splora_model(
     for name, param in model.named_parameters():
         if not any(x in name for x in ["lora_A", "lora_B"]):
             param.requires_grad = False
-    return SpftModel(config, model)
+    return LorsModel(config, model)
 
 def splora_merge_adapters(model):
     for name, module in model.named_modules():

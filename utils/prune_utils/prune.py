@@ -62,7 +62,7 @@ def prepare_calibration_input(model, dataloader, device):
         device = model.hf_device_map["model.embed_tokens"]
 
     dtype = next(iter(model.parameters())).dtype
-    inps = torch.zeros((128, model.seqlen, model.config.hidden_size), dtype=dtype, device=device)
+    inps = torch.zeros((128, max(2048,model.seqlen), model.config.hidden_size), dtype=dtype, device=device)
     inps.requires_grad = False
     cache = {'i': 0, 'attention_mask': None, "position_ids": None}
 
@@ -98,7 +98,7 @@ def prune_model(args, model, tokenizer, device=torch.device("cuda:0"), prune_n=0
     model.config.use_cache = False 
 
     print("loading calibdation data")
-    dataloader, _ = load_calib_data("c4", nsamples=args.nsamples,seed=args.seed,seqlen=model.seqlen,tokenizer=tokenizer)
+    dataloader, _ = load_calib_data("c4", nsamples=args.nsamples,seed=args.seed,seqlen=max(2048,model.seqlen),tokenizer=tokenizer)
     print("dataset loading complete")
     with torch.no_grad():
         inps, outs, attention_mask, position_ids = prepare_calibration_input(model, dataloader, device)
@@ -110,7 +110,10 @@ def prune_model(args, model, tokenizer, device=torch.device("cuda:0"), prune_n=0
 
         if f"model.layers.{i}" in model.hf_device_map:   ## handle the case for llama-30B and llama-65B, when the device map has multiple GPUs;
             dev = model.hf_device_map[f"model.layers.{i}"]
-            inps, outs, attention_mask, position_ids = inps.to(dev), outs.to(dev), attention_mask.to(dev), position_ids.to(dev)
+            if attention_mask == None:
+                inps, outs, position_ids = inps.to(dev), outs.to(dev), position_ids.to(dev)
+            else:
+                inps, outs, attention_mask, position_ids = inps.to(dev), outs.to(dev), attention_mask.to(dev), position_ids.to(dev)
 
         wrapped_layers: dict[str, PruneWrapper] = {}
         for name, module in subset.items():
@@ -130,7 +133,10 @@ def prune_model(args, model, tokenizer, device=torch.device("cuda:0"), prune_n=0
             handles.append(subset[name].register_forward_hook(add_batch(name)))
         for j in range(args.nsamples):
             with torch.no_grad():
-                outs[j] = layer(inps[j].unsqueeze(0), attention_mask=attention_mask, position_ids=position_ids)[0]
+                if attention_mask == None:
+                    outs[j] = layer(inps[j].unsqueeze(0), position_ids=position_ids)[0]
+                else:
+                    outs[j] = layer(inps[j].unsqueeze(0), attention_mask=attention_mask, position_ids=position_ids)[0]
         for h in handles:
             h.remove()
 
@@ -147,7 +153,10 @@ def prune_model(args, model, tokenizer, device=torch.device("cuda:0"), prune_n=0
 
         for j in range(args.nsamples):
             with torch.no_grad():
-                outs[j] = layer(inps[j].unsqueeze(0), attention_mask=attention_mask, position_ids=position_ids)[0]
+                if attention_mask == None:
+                    outs[j] = layer(inps[j].unsqueeze(0), position_ids=position_ids)[0]
+                else:
+                    outs[j] = layer(inps[j].unsqueeze(0), attention_mask=attention_mask, position_ids=position_ids)[0]
         inps, outs = outs, inps
 
     model.config.use_cache = use_cache 

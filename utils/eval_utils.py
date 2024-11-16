@@ -212,7 +212,7 @@ def post_process(text):
 def generate_one_completion(model, tokenizer, model_type, prompt, template=True):
     if template:
         prompt_in = ALPACA_PREFIX_TEMPLATE_MD.format(PROMPT=prompt)
-    pred_text = model_inference(model, tokenizer, prompt_in, model_type, max_target_length=512)
+    pred_text = model_inference(model, tokenizer, prompt_in, model_type, max_target_length=256)
     post_pred = post_process(pred_text)
     return post_pred
 
