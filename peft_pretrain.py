@@ -57,7 +57,7 @@ from utils.parser_utils import add_default_opts
 from utils.scheduler import get_cosine_schedule_with_warmup
 from utils.prompter import Prompter
 
-from lors import AnyConfig, get_peft_and_lors_model, merge_and_unload
+from lors import DispatchConfig, LorsBaseModel, get_model_with_adapters, merge_and_unload
 from utils.data_utils import process_pretrain_data
 
 # Will error if the minimal version of Transformers is not installed. Remove at your own risks.
@@ -89,7 +89,7 @@ def parse_args():
 
     # peft
     parser.add_argument("--peft_method", type=str, default="splora", 
-        choices=["lora", "splora", "splora-gradckpt", "splora-naive", "spp", "spp-naive", "none"]
+        choices=["lora", "lors", "splora", "splora-gradckpt", "splora-naive", "spp", "spp-naive", "none"]
     )
     parser.add_argument("--lora_rank", type=int, default=16)
 
@@ -220,7 +220,7 @@ def main():
     else:
         raise ValueError
 
-    peft_config = AnyConfig(
+    peft_config = DispatchConfig(
         method=args.peft_method,
         r=args.lora_rank,
         lora_alpha=args.lora_rank,
@@ -236,7 +236,7 @@ def main():
         bias="none",
         task_type="CAUSAL_LM",
     )
-    model = get_peft_and_lors_model(model, peft_config)
+    model = get_model_with_adapters(model, peft_config)
     
     # We resize the embeddings only when necessary to avoid index errors. If you are creating a model from scratch
     # on a small vocab and want a smaller embedding size, remove this test.
@@ -317,6 +317,7 @@ def main():
     model, optimizer, train_dataloader, eval_dataloader, lr_scheduler = accelerator.prepare(
         model, optimizer, train_dataloader, eval_dataloader, lr_scheduler
     )
+    unwrapped_model = accelerator.unwrap_model(model)
     
     # On TPU, the tie weights in our model have been disconnected, so we need to restore the ties.
     if accelerator.distributed_type == DistributedType.TPU:
@@ -407,6 +408,8 @@ def main():
                     total_loss += loss.detach().float()
                 accelerator.backward(loss)
                 optimizer.step()
+                if isinstance(unwrapped_model, LorsBaseModel):
+                    unwrapped_model.update_adapters()
                 lr_scheduler.step()
                 optimizer.zero_grad()
 

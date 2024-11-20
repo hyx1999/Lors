@@ -24,7 +24,7 @@ class LorsLinear(Linear):
         bias: bool = False, 
         device=None, 
         dtype=None,
-        # galore
+        # lors
         r: int = 16,
         alpha: float = 16,
         update_freq: int = 128,
@@ -36,6 +36,10 @@ class LorsLinear(Linear):
         self.forward_step = 0
         self.update_freq = update_freq
         self._reset_lora_parameters()
+
+    def _reset_lora_parameters(self) -> None:
+        nn.init.zeros_(self.lora_A)
+        nn.init.kaiming_uniform_(self.lora_B, a=math.sqrt(5))
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         y = LorsFn.apply(
@@ -50,10 +54,11 @@ class LorsLinear(Linear):
         )
         self.forward_step += 1
         return y
-    
-    def _reset_lora_parameters(self) -> None:
-        nn.init.zeros_(self.lora_A)
-        nn.init.zeros_(self.lora_B)
+
+    @torch.no_grad()
+    def update_adapters(self):
+        self.weight.addmm_(self.lora_B, self.lora_A, alpha=self.alpha)
+        self.lora_A.zero_()
 
     @torch.no_grad()
     def merge_adapter(self):
@@ -61,19 +66,20 @@ class LorsLinear(Linear):
             self.weight.data += self.alpha * (self.lora_B @ self.lora_A)
             delattr(self, "lora_A")
             delattr(self, "lora_B")
-
+            def forward_patch(self, x: torch.Tensor) -> torch.Tensor:
+                return F.linear(x, self.weight, self.bias)
+            self.forward = MethodType(forward_patch, self)
 
 class LorsFn(Function):
-        
+
     @staticmethod
     def forward(
         ctx,
         x: torch.Tensor, 
-        weight: torch.Tensor, 
+        weight: torch.Tensor,
         bias: torch.Tensor,
-        lora_A: torch.Tensor, 
+        lora_A: torch.Tensor,
         lora_B: torch.Tensor,
-        alpha: float,
         forward_step: int,
         update_freq: int,
     ) -> torch.Tensor:
@@ -81,12 +87,11 @@ class LorsFn(Function):
         ctx.update_freq = update_freq
         output_shape = x.shape[:-1] + (-1,)
         x = x.view(-1, x.shape[-1])
-        weight = sparsify(weight.addmm(lora_B, lora_A, alpha=alpha))
-        y = x.mm(weight.t()).view(output_shape)
+        sparse_weight = sparsify(weight)
+        y = x.mm(sparse_weight.t()).view(output_shape)
         if bias is not None:
             y.add_(bias)
-        lora_A.zero_()
-        ctx.save_for_backward(x, weight, lora_B)
+        ctx.save_for_backward(x, sparse_weight, lora_B)
         return y
 
     @staticmethod
@@ -95,7 +100,7 @@ class LorsFn(Function):
         ctx, 
         d_y: torch.Tensor
     ) -> Tuple[torch.Tensor]:
-        x, weight, lora_B = ctx.saved_tensors
+        x, sparse_weight, lora_B = ctx.saved_tensors
                 
         x_shape = x.shape
         grad_output_shape = d_y.shape
@@ -108,7 +113,7 @@ class LorsFn(Function):
 
         d_x = d_weight = d_bias = d_lora_A = None
         if ctx.needs_input_grad[0]:
-            d_x = d_y.mm(weight)
+            d_x = d_y.mm(sparse_weight)
 
         if ctx.needs_input_grad[1]:
             d_weight = d_w

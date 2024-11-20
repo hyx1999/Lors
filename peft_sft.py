@@ -57,7 +57,7 @@ from utils.parser_utils import add_default_opts
 from utils.scheduler import get_cosine_schedule_with_warmup
 from utils.prompter import Prompter
 
-from lors import AnyConfig, get_peft_and_lors_model, merge_and_unload
+from lors import DispatchConfig, get_model_with_adapters, merge_and_unload
 from utils.data_utils import process_sft_data
 
 # Will error if the minimal version of Transformers is not installed. Remove at your own risks.
@@ -210,7 +210,7 @@ def main():
     else:
         raise ValueError
 
-    peft_config = AnyConfig(
+    peft_config = DispatchConfig(
         method=args.peft_method,
         r=args.lora_rank,
         lora_alpha=args.lora_rank,
@@ -226,7 +226,7 @@ def main():
         bias="none",
         task_type="CAUSAL_LM",
     )
-    model = get_peft_and_lors_model(model, peft_config)
+    model = get_model_with_adapters(model, peft_config)
     
     # We resize the embeddings only when necessary to avoid index errors. If you are creating a model from scratch
     # on a small vocab and want a smaller embedding size, remove this test.

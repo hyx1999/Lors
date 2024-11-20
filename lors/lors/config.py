@@ -1,7 +1,7 @@
+from lors.base.base_config import LorsBaseConfig
 from dataclasses import dataclass, field
 from typing import Literal, Any
 
 @dataclass
-class LorsConfig:
-    r: int = 16
-    lora_alpha: float = 16.0
+class LorsConfig(LorsBaseConfig):
+    pass
