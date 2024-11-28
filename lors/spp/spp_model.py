@@ -50,7 +50,7 @@ class SppModel(LorsBaseModel):
             if isinstance(module, (SppLinear, SppLinearNO)):
                 module.merge_adapter()
     
-    def update_adapters(self):
+    def update_step(self):
         pass
 
 def get_spp_model(model, config):

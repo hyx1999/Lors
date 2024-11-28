@@ -57,7 +57,7 @@ from utils.parser_utils import add_default_opts
 from utils.scheduler import get_cosine_schedule_with_warmup
 from utils.prompter import Prompter
 
-from lors import DispatchConfig, get_model_with_adapters, merge_and_unload
+from lors import DispatchConfig, LorsBaseModel, get_model_with_adapters, merge_and_unload
 from utils.data_utils import process_domain_data
 
 # Will error if the minimal version of Transformers is not installed. Remove at your own risks.
@@ -86,6 +86,11 @@ def parse_args():
     )
     parser.add_argument("--lora_rank", type=int, default=16)
     parser.add_argument("--evaluate", action="store_true")
+
+    # lors
+    parser.add_argument("--sparsify_update_freq", type=int, default=256)
+    parser.add_argument("--grad_update_freq", type=int, default=128)    
+
     args = parser.parse_args()
 
     # Sanity checks
@@ -212,7 +217,7 @@ def main():
     else:
         raise ValueError
 
-    any_config = DispatchConfig(
+    dispatch_config = DispatchConfig(
         method=args.peft_method,
         r=args.lora_rank,
         lora_alpha=args.lora_rank,
@@ -227,8 +232,10 @@ def main():
         ],
         bias="none",
         task_type="CAUSAL_LM",
+        sparsify_update_freq=args.sparsify_update_freq,
+        grad_update_freq=args.grad_update_freq,
     )
-    model = get_model_with_adapters(model, any_config)
+    model = get_model_with_adapters(model, dispatch_config)
     
     # We resize the embeddings only when necessary to avoid index errors. If you are creating a model from scratch
     # on a small vocab and want a smaller embedding size, remove this test.
@@ -318,6 +325,7 @@ def main():
     model, optimizer, train_dataloader, eval_dataloader, lr_scheduler = accelerator.prepare(
         model, optimizer, train_dataloader, eval_dataloader, lr_scheduler
     )
+    base_model = accelerator.unwrap_model(model)
     
     # On TPU, the tie weights in our model have been disconnected, so we need to restore the ties.
     if accelerator.distributed_type == DistributedType.TPU:
@@ -410,9 +418,13 @@ def main():
                 optimizer.step()
                 lr_scheduler.step()
                 optimizer.zero_grad()
+                if isinstance(base_model, LorsBaseModel):
+                    base_model.update_substep()
 
             # Checks if the accelerator has performed an optimization step behind the scenes
             if accelerator.sync_gradients:
+                if isinstance(base_model, LorsBaseModel):
+                    base_model.update_step()
                 progress_bar.update(1)
                 progress_bar.set_postfix({"step": step, "loss": loss.detach().float().item()})
                 completed_steps += 1
@@ -481,11 +493,9 @@ def main():
 
     if args.output_dir is not None:
         accelerator.wait_for_everyone()
-        unwrapped_model = accelerator.unwrap_model(model)
-        unwrapped_model = merge_and_unload(unwrapped_model, any_config)
-
-        unwrapped_model.to("cpu")
-        unwrapped_model.save_pretrained(args.output_dir, is_main_process=accelerator.is_main_process)
+        base_model = accelerator.unwrap_model(model)
+        base_model = merge_and_unload(base_model, dispatch_config)
+        base_model.save_pretrained(args.output_dir, is_main_process=accelerator.is_main_process)
         tokenizer.save_pretrained(args.output_dir, is_main_process=accelerator.is_main_process)
         if accelerator.is_main_process:
             # tokenizer.save_pretrained(args.output_dir)

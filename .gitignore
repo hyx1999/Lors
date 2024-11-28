@@ -11,7 +11,9 @@ __pycache__/
 *.py[cod]
 *$py.class
 
-kernels
 kernels_test
+build
+dist
+*.egg-info
 # Log
 misc

@@ -4,4 +4,5 @@ from typing import Literal, Any
 
 @dataclass
 class LorsConfig(LorsBaseConfig):
-    pass
+    sparsify_update_freq = field(default=256)
+    grad_update_freq = field(default=128)

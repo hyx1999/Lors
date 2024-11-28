@@ -19,5 +19,8 @@ class LorsBaseModel(nn.Module):
     def merge_and_unload(self):
         pass
     
-    def update_adapters(self):
+    def update_substep(self):
+        pass
+    
+    def update_step(self):
         pass

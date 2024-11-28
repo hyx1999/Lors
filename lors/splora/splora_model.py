@@ -52,7 +52,7 @@ class SpLoraModel(LorsBaseModel):
             if isinstance(module, (SpLoraLinear, SpLoraLinearGC, SpLoraLinearNO)):
                 module.merge_adapter()
     
-    def update_adapters(self):
+    def update_step(self):
         pass
 
 def get_splora_model(model, config):
